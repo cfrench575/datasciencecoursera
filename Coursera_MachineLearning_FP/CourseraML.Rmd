@@ -1,0 +1,82 @@
+---
+title: "MachineLearning_courseraFP"
+author: "Chelsea French"
+date: "March 11, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Packages
+
+```{r, message=FALSE, warning=FALSE}
+library('caret')
+```
+
+## Load training data 
+```{r}
+filename<-"pml-training.csv"
+training<-read.csv(filename)
+```
+
+## Clean training data
+
+### Remove index/time stamp columns
+Items were sorted by Classe, therefore, classe correlated to index and time stamp variables. To prevent spurious associations, these variables were removed.
+```{r}
+training_clean<-training[-c(1, 3:5)]
+```
+
+### Remove columns with missing values
+Multiple columns contributed very little information (less than 1% of individuals had data). For model parsimony, columns were removed. 
+```{r}
+training_clean<-training_clean[,colSums(is.na(training_clean)) == 0]
+training_clean<-training_clean[,colSums(training_clean=="")==0]
+```
+
+## Subset into training and validation
+To test model performance on validation set before application to test data
+```{r}
+inTrain<-createDataPartition(y=training_clean$classe, p=0.7,list=FALSE)
+trainingSub<-training_clean[inTrain,]
+validationSub<-training_clean[-inTrain,]
+```
+
+## Use 10-fold cross validation
+Model was cross-validated by partitioning data into training and validation sets, and further subsetting training data into 10 subsets. 
+
+```{r}
+control <- trainControl(method="cv", number=10)
+```
+
+## Create LDA model
+Objective of research question was to classify a factor using various predictors. Naive Bayes is simplier but assumes but assumes independence among predictors. Because I don't have to worry about scalability with this assignment, I chose to use the more complicated LDA model to get more accurate predictions. The LDA model is computationally convenient and takes advantage of the existing data structure. 
+```{r}
+mod_lda=train(classe~.,data=trainingSub,method="lda", trControl=control)
+```
+
+## Predictions for validation data
+Sample Error rate is the number of misclassifications divided by the total number of cases.
+
+1,121/19622 = Sample error rate of about 5.7%
+
+
+```{r}
+pred_lda<-predict(mod_lda, validationSub)
+confusionMatrix(pred_lda, validationSub$classe)
+```
+
+## Run LDA model on test data
+```{r, message=FALSE, warning=FALSE}
+filename<-"pml-testing.csv"
+testing<-read.csv(filename)
+
+testing_col<-testing[,colSums(is.na(testing)) == 0]
+testing_col<-testing_col[,colSums(testing_col=="")==0]
+
+pred_lda<-predict(mod_lda, testing_col)
+
+pred_lda
+```
